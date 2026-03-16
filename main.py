@@ -1,15 +1,14 @@
 import os
 import requests
-from pprint import pprint
 from itertools import count
 from dotenv import load_dotenv
 from terminaltables import SingleTable
 
 
-def get_vacancies_hh(program_lang, region_hh):
+def get_vacancies_hh(prog_lang, region_hh):
     for page in count(0):
         headers = {'User-Agent': 'HH-User-Agent'}
-        payload = {'text': f'программист {program_lang}', 'area': region_hh, 'page': page}
+        payload = {'text': f'программист {prog_lang}', 'area': region_hh, 'page': page}
         url_hh = 'https://api.hh.ru/vacancies'
         response = requests.get(url_hh, params=payload, headers=headers)
         response.raise_for_status()
@@ -20,10 +19,10 @@ def get_vacancies_hh(program_lang, region_hh):
         if page >= page_payload['pages']:
             break
 
-def get_vacancies_sj(program_lang, region_sj, sj_token):
+def get_vacancies_sj(prog_lang, region_sj, sj_token):
     for page in count(0):
         headers = {'X-Api-App-Id': sj_token}
-        payload = {'catalogues': 48, 'keywords': program_lang, 'town': region_sj, 'page': page, 'count': 100}
+        payload = {'catalogues': 48, 'keywords': prog_lang, 'town': region_sj, 'page': page, 'count': 100}
         url_sj = 'https://api.superjob.ru/2.0/vacancies'
         response = requests.get(url_sj, params=payload, headers=headers)
         response.raise_for_status()
@@ -33,7 +32,6 @@ def get_vacancies_sj(program_lang, region_sj, sj_token):
         yield from page_payload['objects']    
         if not page_payload['more']:
             break
-        print(page_payload)
 
 def predict_rub_salary_hh(vacancy):
     try:
@@ -61,10 +59,10 @@ def predict_rub_salary_sj(vacancy):
     except:
         return None
 
-def get_hh_vacancy_stats(program_lang_list, region_hh):
-    language_vacancies_count = {}
-    for program_lang in program_lang_list:
-        vacancies = list(get_vacancies_hh(program_lang, region_hh))
+def get_hh_vacancy_stats(prog_languages, region_hh):
+    lang_stats = {}
+    for prog_lang in prog_languages:
+        vacancies = list(get_vacancies_hh(prog_lang, region_hh))
         vacancies_found = vacancies[0]['found']
         vacancies_for_processing = vacancies[1:]
         vacancies_processed = 0
@@ -77,19 +75,19 @@ def get_hh_vacancy_stats(program_lang_list, region_hh):
                     vacancies_processed += 1
                     total_salary += medium_salary
             average_salary = int(total_salary / vacancies_processed)
-        language_vacancies_count.update({
-            program_lang: {
+        lang_stats.update({
+            prog_lang: {
                 'vacancies_found': vacancies_found,
                 'vacancies_processed': vacancies_processed,
                 'average_salary': average_salary
                 }
             })
-    return language_vacancies_count
+    return lang_stats
 
-def get_sj_vacancy_stats(program_lang_list, region_sj, sj_token):
-    language_vacancies_count = {}
-    for program_lang in program_lang_list:
-        vacancies = list(get_vacancies_sj(program_lang, region_sj, sj_token))
+def get_sj_vacancy_stats(prog_languages, region_sj, sj_token):
+    lang_stats = {}
+    for prog_lang in prog_languages:
+        vacancies = list(get_vacancies_sj(prog_lang, region_sj, sj_token))
         vacancies_found = vacancies[0]['found']
         vacancies_for_processing = vacancies[1:]
         vacancies_processed = 0
@@ -102,24 +100,24 @@ def get_sj_vacancy_stats(program_lang_list, region_sj, sj_token):
                     vacancies_processed += 1
                     total_salary += medium_salary
             average_salary = int(total_salary / vacancies_processed)
-        language_vacancies_count.update({
-            program_lang: {
+        lang_stats.update({
+            prog_lang: {
                 'vacancies_found': vacancies_found,
                 'vacancies_processed': vacancies_processed,
                 'average_salary': average_salary
                 }
             })
-    return language_vacancies_count   
+    return lang_stats   
 
-def print_stats_table(language_vacancies_count, title):
+def print_stats_table(lang_stats, title):
     table_data = [
         ['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата'],
         *[
-            [program_lang,
+            [prog_lang,
             stats['vacancies_found'],
             stats['vacancies_processed'],
             stats['average_salary']]
-            for program_lang, stats in language_vacancies_count.items()
+            for prog_lang, stats in lang_stats.items()
         ]
     ]
 
@@ -132,17 +130,17 @@ def main():
     load_dotenv()
     sj_token = os.environ['SJ_TOKEN']
     
-    program_lang_list = ['C#', 'Objective-C', 'Ruby', 'Java', 'Typescript', 'Scala', 'Go', 'Swift', 'C++', 'PHP', 'JavaScript', 'Python']
+    prog_languages = ['C#', 'Objective-C', 'Ruby', 'Java', 'Typescript', 'Scala', 'Go', 'Swift', 'C++', 'PHP', 'JavaScript', 'Python']
     
     region_hh = 1
     region_sj = 4
     title_hh = 'HeadHunter Moscow'
     title_sj = 'SuperJob Moscow'
 
-    language_vacancies_count = get_hh_vacancy_stats(program_lang_list, region_hh)
-    print_stats_table(language_vacancies_count, title_hh)
-    language_vacancies_count = get_sj_vacancy_stats(program_lang_list, region_sj, sj_token)
-    print_stats_table(language_vacancies_count, title_sj)
+    lang_stats = get_hh_vacancy_stats(prog_languages, region_hh)
+    print_stats_table(lang_stats, title_hh)
+    lang_stats = get_sj_vacancy_stats(prog_languages, region_sj, sj_token)
+    print_stats_table(lang_stats, title_sj)
 
 if __name__ == '__main__':
     main()
