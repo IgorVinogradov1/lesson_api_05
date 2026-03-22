@@ -6,65 +6,76 @@ from terminaltables import SingleTable
 
 
 def get_vacancies_hh(prog_lang, region_hh):
+    vacancies_catalog = []
+    headers = {'User-Agent': 'HH-User-Agent'}
+    payload = {'text': f'программист {prog_lang}', 'area': region_hh}
+    url_hh = 'https://api.hh.ru/vacancies'
+    response = requests.get(url_hh, params=payload, headers=headers)
+    response.raise_for_status()
+    vacancies_found = response.json()['found']
     for page in count(0):
-        headers = {'User-Agent': 'HH-User-Agent'}
         payload = {'text': f'программист {prog_lang}', 'area': region_hh, 'page': page}
-        url_hh = 'https://api.hh.ru/vacancies'
         response = requests.get(url_hh, params=payload, headers=headers)
         response.raise_for_status()
         page_payload = response.json()
-        if page == 0:
-            yield {'found': page_payload['found']}
-        yield from page_payload['items']
+        vacancies_catalog.extend(page_payload['items'])
         if page >= page_payload['pages']:
-            break
+            break   
+    return vacancies_found, vacancies_catalog
 
 def get_vacancies_sj(prog_lang, region_sj, sj_token):
+    vacancies_catalog = []
+    headers = {'X-Api-App-Id': sj_token}
+    payload = {'catalogues': 48, 'keywords': prog_lang, 'town': region_sj}
+    url_sj = 'https://api.superjob.ru/2.0/vacancies'
+    response = requests.get(url_sj, params=payload, headers=headers)
+    response.raise_for_status()
+    vacancies_found = response.json()['total']
     for page in count(0):
-        headers = {'X-Api-App-Id': sj_token}
         payload = {'catalogues': 48, 'keywords': prog_lang, 'town': region_sj, 'page': page, 'count': 100}
-        url_sj = 'https://api.superjob.ru/2.0/vacancies'
         response = requests.get(url_sj, params=payload, headers=headers)
         response.raise_for_status()
         page_payload = response.json()
-        if page == 0:
-            yield {'found': page_payload['total']}
-        yield from page_payload['objects']    
+        vacancies_catalog.extend(page_payload['objects'])
         if not page_payload['more']:
-            break
+            break   
+    return vacancies_found, vacancies_catalog
 
 def predict_rub_salary_hh(vacancy):
-    try:
-        if 'salary' not in vacancy or vacancy['salary'].get('currency') != 'RUR':
-            return None
-        elif vacancy['salary'].get('from') is None:
-            return int(vacancy['salary'].get('to') * 0.8) 
-        elif vacancy['salary'].get('to') is None:
-            return int(vacancy['salary'].get('from') * 1.2)
-        else:
-            return int((vacancy['salary'].get('from') + vacancy['salary'].get('to')) / 2)
-    except:
+    salary = vacancy.get('salary')
+    if not salary:
+        return None
+    if salary.get('currency') != 'RUR':
         return None
 
+    frm = salary.get('from')
+    to = salary.get('to')
+
+    if not frm:
+        return int(to * 0.8)
+    elif not to:
+        return int(frm * 1.2)
+    else:
+        return int((frm + to) / 2)
+
 def predict_rub_salary_sj(vacancy):
-    try:
-        if (vacancy['payment_from'] == 0 and vacancy['payment_to'] == 0) or vacancy['currency'] != 'rub':
-            return None
-        elif vacancy['payment_from'] != 0 and vacancy['payment_to'] == 0:
-            return int(vacancy['payment_from'] * 1.2)
-        elif vacancy['payment_from'] == 0 and vacancy['payment_to'] != 0:
-            return int(vacancy['payment_to'] * 0.8)
-        else:
-            return int((vacancy['payment_from'] + vacancy['payment_to']) / 2)  
-    except:
+    frm = vacancy.get('payment_from')
+    to = vacancy.get('payment_to')
+    currency = vacancy.get('currency')
+
+    if (not frm and not to) or currency != 'rub':
         return None
+    elif frm and not to:
+        return int(frm * 1.2)
+    elif to and not frm:
+        return int(to * 0.8)
+    else:
+        return int((frm + to) / 2)  
 
 def get_hh_vacancy_stats(prog_languages, region_hh):
     lang_stats = {}
     for prog_lang in prog_languages:
-        vacancies = list(get_vacancies_hh(prog_lang, region_hh))
-        vacancies_found = vacancies[0]['found']
-        vacancies_for_processing = vacancies[1:]
+        vacancies_found, vacancies_for_processing = get_vacancies_hh(prog_lang, region_hh)
         vacancies_processed = 0
         total_salary = 0
         average_salary = 0
@@ -74,22 +85,19 @@ def get_hh_vacancy_stats(prog_languages, region_hh):
                 if medium_salary:
                     vacancies_processed += 1
                     total_salary += medium_salary
-            average_salary = int(total_salary / vacancies_processed)
-        lang_stats.update({
-            prog_lang: {
-                'vacancies_found': vacancies_found,
-                'vacancies_processed': vacancies_processed,
-                'average_salary': average_salary
-                }
-            })
+            if vacancies_processed > 0:
+                average_salary = int(total_salary / vacancies_processed)
+        lang_stats[prog_lang] = {
+            'vacancies_found': vacancies_found,
+            'vacancies_processed': vacancies_processed,
+            'average_salary': average_salary
+        }
     return lang_stats
 
 def get_sj_vacancy_stats(prog_languages, region_sj, sj_token):
     lang_stats = {}
     for prog_lang in prog_languages:
-        vacancies = list(get_vacancies_sj(prog_lang, region_sj, sj_token))
-        vacancies_found = vacancies[0]['found']
-        vacancies_for_processing = vacancies[1:]
+        vacancies_found, vacancies_for_processing = get_vacancies_sj(prog_lang, region_sj, sj_token)
         vacancies_processed = 0
         total_salary = 0
         average_salary = 0
@@ -99,14 +107,13 @@ def get_sj_vacancy_stats(prog_languages, region_sj, sj_token):
                 if medium_salary:
                     vacancies_processed += 1
                     total_salary += medium_salary
-            average_salary = int(total_salary / vacancies_processed)
-        lang_stats.update({
-            prog_lang: {
-                'vacancies_found': vacancies_found,
-                'vacancies_processed': vacancies_processed,
-                'average_salary': average_salary
-                }
-            })
+            if vacancies_processed > 0:
+                average_salary = int(total_salary / vacancies_processed)
+        lang_stats[prog_lang] = {
+            'vacancies_found': vacancies_found,
+            'vacancies_processed': vacancies_processed,
+            'average_salary': average_salary
+        }
     return lang_stats   
 
 def print_stats_table(lang_stats, title):
@@ -144,4 +151,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
