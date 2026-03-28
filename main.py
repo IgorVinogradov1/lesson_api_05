@@ -67,9 +67,6 @@ def predict_rub_salary_sj(vacancy):
         return None
     return calculate_median_salary(frm, to)
 
-def get_average_salary(total_salary, vacancies_processed):
-    return int(total_salary / vacancies_processed)
-
 def get_hh_vacancy_stats(prog_languages, region_hh):
     lang_stats = {}
     for prog_lang in prog_languages:
@@ -83,8 +80,8 @@ def get_hh_vacancy_stats(prog_languages, region_hh):
                 if medium_salary:
                     vacancies_processed += 1
                     total_salary += medium_salary
-            if vacancies_processed:
-                average_salary = get_average_salary(total_salary, vacancies_processed)
+        if vacancies_processed:
+            average_salary = int(total_salary / vacancies_processed)
         lang_stats[prog_lang] = {
             'vacancies_found': vacancies_found,
             'vacancies_processed': vacancies_processed,
@@ -105,8 +102,8 @@ def get_sj_vacancy_stats(prog_languages, industry_sj, region_sj, sj_token):
                 if medium_salary:
                     vacancies_processed += 1
                     total_salary += medium_salary
-            if vacancies_processed:
-                average_salary = get_average_salary(total_salary, vacancies_processed)
+        if vacancies_processed:
+            average_salary = int(total_salary / vacancies_processed)
         lang_stats[prog_lang] = {
             'vacancies_found': vacancies_found,
             'vacancies_processed': vacancies_processed,
