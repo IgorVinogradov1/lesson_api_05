@@ -39,7 +39,7 @@ def get_vacancies_sj(prog_lang, industry_sj, region_sj, sj_token):
             break   
     return vacancies_found, vacancies_catalog
 
-def medium_salary_calculation(frm, to):
+def calculate_median_salary(frm, to):
     if not frm:
         return int(to * 0.8)
     elif not to:
@@ -56,7 +56,7 @@ def predict_rub_salary_hh(vacancy):
 
     frm = salary.get('from')
     to = salary.get('to')
-    return medium_salary_calculation(frm, to)
+    return calculate_median_salary(frm, to)
 
 def predict_rub_salary_sj(vacancy):
     frm = vacancy.get('payment_from')
@@ -65,7 +65,10 @@ def predict_rub_salary_sj(vacancy):
 
     if (not frm and not to) or currency != 'rub':
         return None
-    return medium_salary_calculation(frm, to)
+    return calculate_median_salary(frm, to)
+
+def get_average_salary(total_salary, vacancies_processed):
+    return int(total_salary / vacancies_processed)
 
 def get_hh_vacancy_stats(prog_languages, region_hh):
     lang_stats = {}
@@ -81,7 +84,7 @@ def get_hh_vacancy_stats(prog_languages, region_hh):
                     vacancies_processed += 1
                     total_salary += medium_salary
             if vacancies_processed:
-                average_salary = int(total_salary / vacancies_processed)
+                average_salary = get_average_salary(total_salary, vacancies_processed)
         lang_stats[prog_lang] = {
             'vacancies_found': vacancies_found,
             'vacancies_processed': vacancies_processed,
@@ -103,7 +106,7 @@ def get_sj_vacancy_stats(prog_languages, industry_sj, region_sj, sj_token):
                     vacancies_processed += 1
                     total_salary += medium_salary
             if vacancies_processed:
-                average_salary = int(total_salary / vacancies_processed)
+                average_salary = get_average_salary(total_salary, vacancies_processed)
         lang_stats[prog_lang] = {
             'vacancies_found': vacancies_found,
             'vacancies_processed': vacancies_processed,
